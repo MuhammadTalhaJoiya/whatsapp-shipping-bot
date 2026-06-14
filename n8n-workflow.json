@@ -1,0 +1,294 @@
+{
+  "name": "WhatsApp Shipping Rate Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-shipping",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-0001-webhook",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "whatsapp-shipping"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond-event",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "messages.upsert",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-fromme",
+              "leftValue": "={{ $json.body.data.key.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-0002-filter",
+      "name": "Valid Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-phone",
+              "name": "phone",
+              "value": "={{ $json.body.data.key.remoteJid }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-name",
+              "name": "customerName",
+              "value": "={{ $json.body.data.pushName }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-msg",
+              "name": "messageText",
+              "value": "={{ $json.body.data.message.conversation || $json.body.data.message.extendedTextMessage?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-instance",
+              "name": "instanceName",
+              "value": "={{ $json.body.instance }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-0003-extract",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_GROQ_API_KEY_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ \"model\": \"llama-3.1-8b-instant\", \"messages\": [{ \"role\": \"system\", \"content\": \"You are a shipping assistant. Extract the origin port/city and destination port/city from the user message. Return ONLY valid JSON in this exact format: {\\\"origin\\\": \\\"CITY_NAME\\\", \\\"destination\\\": \\\"CITY_NAME\\\"}. Normalize abbreviations: KHI=Karachi, DXB=Dubai, JEBEL ALI=Jebel Ali, SHA=Shanghai, GZ=Guangzhou, CAN=Guangzhou. If the message is NOT a shipping inquiry return {\\\"origin\\\": null, \\\"destination\\\": null}. Do not add any explanation.\" }, { \"role\": \"user\", \"content\": $json.messageText }], \"temperature\": 0.1, \"max_tokens\": 150 }) }}",
+        "options": {}
+      },
+      "id": "node-0004-groq",
+      "name": "Groq: Extract Route",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nlet parsed = { origin: null, destination: null };\n\ntry {\n  const content = item.choices[0].message.content.trim();\n  const jsonMatch = content.match(/\\{[\\s\\S]*?\\}/);\n  if (jsonMatch) {\n    parsed = JSON.parse(jsonMatch[0]);\n  }\n} catch (e) {\n  parsed = { origin: null, destination: null };\n}\n\nconst prev = $('Extract Message').first().json;\n\nreturn [{\n  json: {\n    origin: parsed.origin ? parsed.origin.toLowerCase().trim() : null,\n    destination: parsed.destination ? parsed.destination.toLowerCase().trim() : null,\n    phone: prev.phone,\n    customerName: prev.customerName,\n    messageText: prev.messageText,\n    instanceName: prev.instanceName\n  }\n}];"
+      },
+      "id": "node-0005-parse",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond-origin",
+              "leftValue": "={{ $json.origin }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "cond-dest",
+              "leftValue": "={{ $json.destination }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-0006-check",
+      "name": "Valid Shipping Query?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "19po22BzJMvRdOtoIdTfWqbrQnBDbLiQckMsjViXs7lc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Base Rate",
+          "mode": "name"
+        },
+        "options": {
+          "range": "A5:J"
+        }
+      },
+      "id": "node-0007-sheets",
+      "name": "Get All Rates",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1560, 180],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allRates = $input.all();\nconst q = $('Parse AI Response').first().json;\nconst { origin, destination, phone, customerName, instanceName } = q;\n\nconst matched = allRates.filter(item => {\n  const r = item.json;\n  const rOrigin = (r['Origins*'] || '').toLowerCase();\n  const rDest   = (r['Destinations*'] || '').toLowerCase();\n  return rOrigin.includes(origin) && rDest.includes(destination);\n});\n\nlet msg = '';\n\nif (matched.length === 0) {\n  msg  = `❌ *No rates found*\\n`;\n  msg += `🗺️ ${origin?.toUpperCase()} → ${destination?.toUpperCase()}\\n\\n`;\n  msg += `This route may not be available yet.\\n`;\n  msg += `📞 Please contact our team for this inquiry.`;\n} else {\n  const r = matched[0].json;\n  const expiry = r['Rate Expiry Date*'] || 'N/A';\n  const currency = r['Currency*'] || 'USD';\n  const rate20 = r['Rate 20'];\n  const rate40h = r['Rate 40H'];\n\n  msg  = `🚢 *Vayani Shipping Line*\\n`;\n  msg += `🗺️ *${origin?.toUpperCase()} → ${destination?.toUpperCase()}*\\n`;\n  msg += `━━━━━━━━━━━━━━━━━━━━\\n\\n`;\n\n  if (rate20) msg += `📦 *20ft Container*\\n💵 $${rate20} ${currency}\\n\\n`;\n  if (rate40h) msg += `📦 *40ft HC Container*\\n💵 $${rate40h} ${currency}\\n\\n`;\n\n  msg += `⚠️ _EBS: $25/TEU additional_\\n`;\n  msg += `✅ *Valid Until:* ${expiry}\\n`;\n  msg += `\\n━━━━━━━━━━━━━━━━━━━━\\n`;\n  msg += `_For bookings & locals charges, contact our team._`;\n}\n\nreturn [{ json: { replyMessage: msg, phone, instanceName } }];"
+      },
+      "id": "node-0008-match",
+      "name": "Match and Format Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ replyMessage: $json.replyMessage }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-0009-respond-rate",
+      "name": "Send Rate Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $input.first().json;\n\nconst msg = `👋 Hi! I am your *Shipping Rate Assistant* 🚢\\n\\nPlease send your inquiry like this:\\n*Origin to Destination*\\n\\n📌 Examples:\\n• Karachi to Jebel Ali\\n• Shanghai to Dubai\\n• Guangzhou to Karachi\\n\\nI will reply with the latest freight rates instantly!`;\n\nreturn [{ json: { replyMessage: msg, phone: q.phone, instanceName: q.instanceName } }];"
+      },
+      "id": "node-0010-help",
+      "name": "Format Help Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 440]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ replyMessage: $json.replyMessage }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-0011-respond-help",
+      "name": "Send Help Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 440]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [
+        [{ "node": "Valid Message?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Valid Message?": {
+      "main": [
+        [{ "node": "Extract Message", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [{ "node": "Groq: Extract Route", "type": "main", "index": 0 }]
+      ]
+    },
+    "Groq: Extract Route": {
+      "main": [
+        [{ "node": "Parse AI Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [{ "node": "Valid Shipping Query?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Valid Shipping Query?": {
+      "main": [
+        [{ "node": "Get All Rates", "type": "main", "index": 0 }],
+        [{ "node": "Format Help Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get All Rates": {
+      "main": [
+        [{ "node": "Match and Format Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Match and Format Reply": {
+      "main": [
+        [{ "node": "Send Rate Reply", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Help Message": {
+      "main": [
+        [{ "node": "Send Help Reply", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "shipping-rate-bot-v1"
+  }
+}
