@@ -1,9 +1,9 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const http = require('http');
 const https = require('https');
 
-const N8N_WEBHOOK = 'https://talhajoiya.app.n8n.cloud/webhook/whatsapp-shipping';
+const N8N_WEBHOOK = 'https://n8n-production-aecf.up.railway.app/webhook/whatsapp-shipping';
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './whatsapp-session' }),
@@ -76,11 +76,12 @@ client.on('message', async (msg) => {
     const req = https.request(options, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
-        res.on('end', () => {
+        res.on('end', async () => {
             try {
                 const response = JSON.parse(data);
                 if (response.replyMessage) {
-                    msg.reply(response.replyMessage);
+                    const logo = MessageMedia.fromFilePath('./LOGOO 02.png');
+                    await msg.reply(logo, undefined, { caption: response.replyMessage });
                     console.log(`✉️  Reply sent to ${msg.from}`);
                 }
             } catch (e) {}

@@ -1,7 +1,7 @@
 # WhatsApp Shipping Rate Automation Bot
 
 ## Project Overview
-A WhatsApp-based freight rate inquiry system for **Vayani Shipping Line**. Customers send a message like "Karachi to Bangkok" and instantly receive the latest freight rates without contacting a human operator. Built using n8n Cloud, Groq AI, Google Sheets, and a custom WhatsApp bridge.
+A WhatsApp-based freight rate inquiry system for **International Logistics Services (PVT)**. Customers send a message like "Karachi to Bangkok" and instantly receive the latest freight rates without contacting a human operator. Built using n8n (self-hosted on Railway), Groq AI, Google Sheets, and a custom WhatsApp bridge.
 
 ---
 
@@ -10,10 +10,11 @@ A WhatsApp-based freight rate inquiry system for **Vayani Shipping Line**. Custo
 | Component | Tool | Purpose |
 |---|---|---|
 | WhatsApp Bridge | `whatsapp-bridge.js` (whatsapp-web.js) | Receives/sends WhatsApp messages |
-| Workflow Engine | n8n Cloud | Orchestrates the entire flow |
+| Workflow Engine | n8n (self-hosted on Railway) | Orchestrates the entire flow |
 | AI / NLP | Groq API (llama-3.1-8b-instant) | Extracts origin & destination from message |
 | Rate Database | Google Sheets | Stores freight rates |
 | Runtime | Node.js v24 | Runs the bridge on Windows |
+| Hosting | Railway.app | Hosts n8n 24/7 |
 
 ---
 
@@ -24,7 +25,7 @@ Customer WhatsApp Message ("Karachi to Bangkok")
         ↓
 whatsapp-bridge.js (running on PC, port 3000 for QR)
         ↓ HTTP POST
-n8n Cloud Webhook
+n8n Railway Webhook
         ↓
 Groq AI → extracts { origin: "karachi", destination: "bangkok" }
         ↓
@@ -32,9 +33,9 @@ Google Sheets → finds matching rate row
         ↓
 Format reply message
         ↓
-n8n responds with { replyMessage: "🚢 Vayani Shipping Line..." }
+n8n responds with { replyMessage: "🌐 International Logistics Services (PVT)..." }
         ↓
-whatsapp-bridge.js → msg.reply() → Customer receives reply
+whatsapp-bridge.js → sends ILS logo image with replyMessage as caption → Customer receives reply
 ```
 
 ---
@@ -45,8 +46,9 @@ whatsapp-bridge.js → msg.reply() → Customer receives reply
 C:\watsapp_automation\
 ├── CLAUDE.md                          ← this file
 ├── whatsapp-bridge.js                 ← WhatsApp bridge (runs on PC)
+├── LOGOO 02.png                       ← ILS company logo (sent with every reply)
 ├── whatsapp-session/                  ← WhatsApp login session (auto-created)
-├── n8n-workflow.json                  ← import this into n8n Cloud
+├── n8n-workflow.json                  ← local reference copy of n8n workflow
 ├── docker-compose.yml                 ← Evolution API setup (future use)
 ├── .env                               ← Evolution API env vars (future use)
 ├── package.json                       ← Node.js dependencies
@@ -61,30 +63,52 @@ C:\watsapp_automation\
 ### Groq API
 - Platform: console.groq.com
 - Model: llama-3.1-8b-instant
-- Key placeholder in workflow: `YOUR_GROQ_API_KEY_HERE`
-- Replace in n8n → Groq: Extract Route node → Authorization header
+- Key is hardcoded directly in the Authorization header of the "Groq: Extract Route1" HTTP Request node in n8n
+- No separate n8n credential object needed
 
 ### Google Sheets
 - Spreadsheet name: rate (user named)
 - Spreadsheet ID: `19po22BzJMvRdOtoIdTfWqbrQnBDbLiQckMsjViXs7lc`
 - Sheet tab name: `Base Rate`
-- Range: `A1:J` (n8n reads from row 1; row 1 becomes column headers)
-- Credential: Google Sheets OAuth2 (set up in n8n Cloud)
+- Range: **Detect Automatically** — do NOT set a manual range (e.g. A5:J); doing so causes n8n to treat the first data row as the header, breaking column key matching
+- Credential: **Google Service Account** (NOT OAuth2)
+  - Credential name in n8n: `Google Service Account account`
+  - Service account email: `n8n-sheets-bot-823@first-scarab-499514-n9.iam.gserviceaccount.com`
+  - Google Cloud project: `first-scarab-499514-n9`
+  - Key file: `C:\Users\Anas Rizwan\Downloads\first-scarab-499514-n9-4928e30ace4e.json`
+  - Google Sheets API enabled at: `console.cloud.google.com/apis/library/sheets.googleapis.com?project=first-scarab-499514-n9`
+  - Sheet shared with service account email (Viewer role)
+- Cleanup todo: An unused "Google Sheets account" OAuth2 credential exists in Railway n8n — safe to delete
 
-### n8n Cloud
+### n8n Cloud (EXPIRED — migrated to Railway)
 - Account: talhajoiya.app.n8n.cloud
 - Workflow ID: `nuTbrN3S2pXaGmW2`
-- Test Webhook URL: `https://talhajoiya.app.n8n.cloud/webhook-test/whatsapp-shipping`
-- Production Webhook URL: `https://talhajoiya.app.n8n.cloud/webhook/whatsapp-shipping`
+- Status: Trial expired June 15, 2026 — no longer in use
+
+### n8n Railway (ACTIVE)
+- URL: `https://n8n-production-aecf.up.railway.app`
+- Login: `watcheseliteofficial@gmail.com` / `Admin1234!`
+- Webhook URL: `https://n8n-production-aecf.up.railway.app/webhook/whatsapp-shipping`
+- Project: whatsapp-shipping-bot
+- Project ID: `4a36b5aa-a053-4b8f-a804-0e0bccd1e9b4`
+- Service ID: `576ba0a8-0fe5-4a7a-843c-6adca11c13eb`
+- Environment ID: `a8d2d3f9-f2f8-4893-8d56-1dc2f013990c`
+- Docker image: `n8nio/n8n`
+
+### Railway Account
+- Email: watcheseliteofficial@gmail.com
+- Workspace: Elite Watches's Projects
 
 ### WhatsApp Bridge
 - Bot WhatsApp number: 03191321129
 - Session saved at: `C:\watsapp_automation\whatsapp-session\`
 - Runs on: `http://localhost:3000` (QR code page during setup)
+- Logo file: `C:\watsapp_automation\LOGOO 02.png` (sent as image caption with every reply)
+- Webhook URL in bridge: `https://n8n-production-aecf.up.railway.app/webhook/whatsapp-shipping`
 
 ### Contact Details (shown in every bot reply)
 - Phone: +92 300 1467979
-- Email: rizwan@ilsmtc@gmail.com
+- Email: rizwan@ilsmtc.com
 
 ### Evolution API (future use)
 - API Key: in `.env` file → `EVOLUTION_API_KEY`
@@ -95,7 +119,7 @@ C:\watsapp_automation\
 
 ## Google Sheets Column Structure
 
-Sheet tab: `Base Rate` — n8n reads row 1 as column headers (actual header names below)
+Sheet tab: `Base Rate` — n8n reads from row 5 (skipping company header/notes rows)
 
 | n8n Column Key | Description |
 |---|---|
@@ -110,25 +134,27 @@ Sheet tab: `Base Rate` — n8n reads row 1 as column headers (actual header name
 | `col_9` (col I) | Transshipment Ports |
 | `col_10` (col J) | Service Loops |
 
-**Note:** n8n uses row 1 as column headers. Rows 2–6 contain company notes/empty rows. Actual rate data starts around row 7. The sheet has ~94 destinations, all from Karachi. No Middle East routes (Dubai, Jebel Ali) are currently in the sheet.
+**Note:** The sheet column header in col A is still `VAYANI SHIPPING LINE Karachi Locals` — this is the Google Sheets column key used for matching and must NOT be changed. The company name shown in bot replies is separately set to "International Logistics Services (PVT)" in the n8n code node. The sheet has ~94 destinations, all from Karachi.
 
 ---
 
-## n8n Workflow Nodes (11 nodes)
+## n8n Workflow Nodes (live on Railway)
 
 ```
-1. WhatsApp Webhook      → receives POST from bridge (responseMode: responseNode)
-2. Valid Message?        → filters: event=messages.upsert AND fromMe=false
-3. Extract Message       → extracts phone, name, messageText, instanceName
-4. Groq: Extract Route   → calls Groq API to parse origin/destination
-5. Parse AI Response     → parses JSON from Groq, merges with message data
-6. Valid Shipping Query? → checks if origin AND destination are not null
-7. Get All Rates         → reads Google Sheets Base Rate tab (99 rows)
-8. Match and Format      → partial matches origin/destination, formats reply
+1. WhatsApp Webhook1     → receives POST from bridge (responseMode: responseNode)
+2. Valid Message?1       → filters: event=messages.upsert AND fromMe=false
+3. Extract Message1      → extracts phone, name, messageText, instanceName
+4. Groq: Extract Route1  → calls Groq API to parse origin/destination
+5. Parse AI Response1    → parses JSON from Groq, merges with message data
+6. Valid Shipping Query?1→ checks if origin AND destination are not null
+7. Get All Rates1        → reads Google Sheets Base Rate tab (range: Detect Automatically)
+8. Match and Format Reply1 → partial matches origin/destination, formats reply
 9. Send Rate Reply       → Respond to Webhook with { replyMessage }
-10. Format Help Message  → formats help text if not a shipping query
+10. Format Help Message1 → formats help text if not a shipping query
 11. Send Help Reply      → Respond to Webhook with { replyMessage }
 ```
+
+**Key node — Match and Format Reply1:** Contains all message formatting logic including company name, rate display, EBS surcharge note, and contact details. Edit this node in n8n to change reply content.
 
 ---
 
@@ -151,7 +177,7 @@ $body = @{
     pushName = "Test"; message = @{ conversation = "karachi to bangkok" }; messageType = "conversation"
   }
 } | ConvertTo-Json -Depth 5
-Invoke-RestMethod -Uri "https://talhajoiya.app.n8n.cloud/webhook/whatsapp-shipping" -Method POST -Body $body -ContentType "application/json"
+Invoke-RestMethod -Uri "https://n8n-production-aecf.up.railway.app/webhook/whatsapp-shipping" -Method POST -Body $body -ContentType "application/json"
 ```
 
 ---
@@ -160,43 +186,51 @@ Invoke-RestMethod -Uri "https://talhajoiya.app.n8n.cloud/webhook/whatsapp-shippi
 
 Customer sends: `Karachi to Bangkok`
 
-Bot replies:
+Bot replies (ILS logo image + caption):
 ```
-🚢 *Vayani Shipping Line*
-🗺️ Karachi → Bangkok, Thailand
+🌐 *International Logistics Services (PVT)*
+🗺️ KARACHI → BANGKOK
 ━━━━━━━━━━━━━━━━━━━━
 
-📦 *20ft Container:* $325 USD
-📦 *40ft HC Container:* $300 USD
+📦 *20ft Container*
+💵 $325 USD
 
-⚠️ *EBS:* $25/TEU additional
-📋 *Included Surcharges:* AMS;BAF;CWC;CWX;EMC;FAF;FCR;LSA;LSS;PSS;SEC;THC
+📦 *40ft HC Container*
+💵 $300 USD
 
-📅 *Effective:* 01-Jun-2026
-✅ *Valid Until:* 30-Jun-2026
+⚠️ EBS: $25/TEU additional
+✅ Valid Until: 30-Jun-2026
 
 ━━━━━━━━━━━━━━━━━━━━
-For bookings & local charges, contact us:
-📞 *+92 300 1467979*
-📧 rizwan@ilsmtc@gmail.com
+For bookings & locals charges, contact our team.
+📧 rizwan@ilsmtc.com
+📞 +92 300 1467979
 ```
 
 Customer sends: `Karachi to Dubai` (not in sheet)
 
-Bot replies:
+Bot replies (ILS logo image + caption):
 ```
-❌ *No rates found for this route.*
+❌ *No rates found*
 🗺️ KARACHI → DUBAI
 
-This destination is not in our current rate list.
+This route may not be available yet.
+📞 Please contact our team for this inquiry.
+```
 
-📋 *Available destinations from Karachi:*
-Bangkok, Belawan, Busan, Cebu City, Chattogram... and 69 more
+---
 
-━━━━━━━━━━━━━━━━━━━━
-For bookings & inquiries, contact us:
-📞 *+92 300 1467979*
-📧 rizwan@ilsmtc@gmail.com
+## WhatsApp Bridge — How Replies Work
+
+The bridge (`whatsapp-bridge.js`) sends every reply as a **single WhatsApp message**: the ILS logo image (`LOGOO 02.png`) with the rate text as the image caption. This means:
+- Customer sees the ILS logo at the top
+- Rate details appear as caption text below the logo
+- Everything arrives as one combined message bubble
+
+```javascript
+// Core reply logic in whatsapp-bridge.js
+const logo = MessageMedia.fromFilePath('./LOGOO 02.png');
+await msg.reply(logo, undefined, { caption: response.replyMessage });
 ```
 
 ---
@@ -212,40 +246,45 @@ Google Sheets matching uses **partial match** (case-insensitive):
 - `karachi` matches `Keamari, Karachi, Sindh, Pakistan` ✅
 - `bangkok` matches `Bangkok, Thailand` ✅
 
-Header/notes rows are filtered out before matching (rows where col B / destination is empty).
+---
+
+## Current Status — FULLY DEPLOYED ✅
+
+- ✅ n8n migrated from Cloud to Railway (self-hosted, runs 24/7)
+- ✅ whatsapp-bridge.js updated to point to Railway webhook URL
+- ✅ Workflow imported into Railway n8n
+- ✅ Groq API key added (hardcoded in HTTP Request node header)
+- ✅ Google Sheets connected via Service Account credential (Google Sheets API enabled, sheet shared with service account)
+- ✅ "Get All Rates1" node set to Range: Detect Automatically (fixed "No rates found" bug)
+- ✅ Workflow published/activated on Railway n8n
+- ✅ whatsapp-bridge.js running and connected (WhatsApp session linked, no QR needed on restart)
+- ✅ End-to-end tested: "karachi to bangkok" → full rate reply; "karachi to dubai" → no rates found; "hello" → help message
+- ❌ PC still required for whatsapp-bridge.js to stay running 24/7 (see Production Upgrade Plan below)
 
 ---
 
-## Current Limitations
+## Monthly Running Cost
 
-- Bot only works while PC is ON and `node whatsapp-bridge.js` is running
-- Not 24/7 yet — needs Railway deployment for production
-- Only Karachi origins in the sheet (all 94+ destinations are from Karachi)
-- University WiFi blocks WhatsApp WebSocket connections — use home WiFi or hotspot
+| Service | Cost |
+|---|---|
+| Railway (n8n self-hosted) | ~$5/month |
+| Groq API | Free tier |
+| Google Sheets | Free |
+| **Total** | **~$5/month** |
 
 ---
 
 ## Production Upgrade Plan (Future)
 
-Deploy Evolution API to Railway.app for 24/7 operation:
+Current setup requires the PC to stay on 24/7 for `whatsapp-bridge.js`. Two options were evaluated to remove this dependency:
 
-```
-Railway.app
-├── Evolution API (v2.2.3)   ← replaces whatsapp-bridge.js
-├── PostgreSQL               ← session storage
-└── Redis                    ← cache
+**Option A — Evolution API on Railway (deferred):**
+Self-hosted WhatsApp API requiring 3 extra Railway services (Evolution API + PostgreSQL + Redis), adding ~$13-18/month. `docker-compose.yml` and `.env` in this repo are pre-configured for this if revisited.
 
-docker-compose.yml is already ready for Railway deployment.
-```
+**Option B — Twilio WhatsApp Business API (current plan):**
+Official WhatsApp Business API, no self-hosted server or PC dependency, pay-per-message (~$0.005/message). Decided as the preferred next step over Evolution API due to lower cost and no infra to maintain. Not yet implemented — would replace `whatsapp-bridge.js` with direct Twilio webhook integration into the existing n8n workflow.
 
-Steps:
-1. Create Railway account
-2. New project → Deploy from GitHub or Docker Compose
-3. Add environment variables from .env
-4. Get Railway public URL
-5. Update n8n "Send WhatsApp Reply" nodes with Railway URL
-6. Scan QR code once in Evolution Manager
-7. Bot runs 24/7
+**Decision:** Keep the current PC + whatsapp-bridge.js setup for now; revisit Twilio migration when PC-dependency becomes a real problem.
 
 ---
 
@@ -256,4 +295,25 @@ Steps:
 - EBS surcharge of $25/TEU is hardcoded in the reply (stated in the sheet header row)
 - Rate data is valid until 30-Jun-2026 — update sheet when new rates arrive
 - WhatsApp session is saved locally — no need to scan QR again unless session expires
-- To add new routes (e.g. Dubai, Jebel Ali), simply add rows to the Google Sheet — the bot picks them up automatically
+- To add new routes, simply add rows to the Google Sheet — the bot picks them up automatically
+- The Google Sheets column key `VAYANI SHIPPING LINE Karachi Locals` is the actual spreadsheet header — do NOT rename it even though the company name in replies is now ILS
+- Chrome DevTools MCP is used to update live n8n nodes — reconnect by restarting Claude Code
+- If Google Sheets ever returns a 403 "Forbidden" error again, check two things: (1) the sheet is still shared with `n8n-sheets-bot-823@first-scarab-499514-n9.iam.gserviceaccount.com`, and (2) the Sheets API is still enabled for project `first-scarab-499514-n9`
+- If "No rates found" appears for a route that's actually in the sheet, check that "Get All Rates1" Range Definition is set to "Detect Automatically" — a manually specified range breaks the column key matching
+
+---
+
+## Troubleshooting "Bot not replying"
+
+When a customer reports no reply, isolate which half of the pipeline is broken before assuming Railway is at fault:
+
+1. **Test n8n/Railway directly** (bypasses the bridge and WhatsApp entirely) using the PowerShell snippet in "Test the Bot" above. If it returns a `replyMessage`, Railway/Groq/Google Sheets are all fine — the problem is in the bridge or WhatsApp itself, not Railway.
+2. **Check the bridge:** `Invoke-RestMethod http://localhost:3000/status` — but note this can report `"connected"` even when the bridge has silently stopped processing real messages. `/status` only reflects whether `client.info` exists, not whether the WhatsApp Web session is actively receiving events.
+3. **If in doubt, just restart the bridge** — it's the cheapest fix and safe to do anytime:
+   ```powershell
+   Get-NetTCPConnection -LocalPort 3000 | Select-Object OwningProcess
+   Stop-Process -Id <pid> -Force
+   Set-Location C:\watsapp_automation; node whatsapp-bridge.js
+   ```
+   The saved session in `whatsapp-session/` means no QR re-scan is needed. After restart, watch the console — real incoming messages log as `📩 Message from ...` followed by `✉️  Reply sent to ...`.
+- Confirmed 2026-06-15: a "not working" report turned out to be the bridge needing a restart, not a Railway/n8n issue — the direct webhook test succeeded the whole time.
