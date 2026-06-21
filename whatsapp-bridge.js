@@ -4,6 +4,7 @@ const http = require('http');
 const https = require('https');
 
 const N8N_WEBHOOK = 'https://n8n-production-aecf.up.railway.app/webhook/whatsapp-shipping';
+const PORT = process.env.BRIDGE_PORT || 3000;
 
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './whatsapp-session' }),
@@ -29,12 +30,12 @@ const server = http.createServer((req, res) => {
     }
 });
 
-server.listen(3000, () => {
+server.listen(PORT, () => {
     console.log('\n================================');
     console.log('WhatsApp Bridge Started!');
     console.log('================================');
     console.log('Open this in your browser to scan QR:');
-    console.log('→ http://localhost:3000/qr');
+    console.log(`→ http://localhost:${PORT}/qr`);
     console.log('================================\n');
 });
 

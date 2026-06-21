@@ -1,7 +1,7 @@
 # WhatsApp Shipping Rate Automation Bot
 
 ## Project Overview
-A WhatsApp-based freight rate inquiry system for **International Logistics Services (PVT)**. Customers send a message like "Karachi to Bangkok" and instantly receive the latest freight rates without contacting a human operator. Built using n8n (self-hosted on Railway), Groq AI, Google Sheets, and a custom WhatsApp bridge.
+A WhatsApp-based freight rate inquiry system for **ILS International Logistics Services**. Customers send a message like "Karachi to Bangkok" and instantly receive the latest freight rates without contacting a human operator. Built using n8n (self-hosted on Railway), Groq AI, Google Sheets, and a custom WhatsApp bridge.
 
 ---
 
@@ -33,7 +33,7 @@ Google Sheets → finds matching rate row
         ↓
 Format reply message
         ↓
-n8n responds with { replyMessage: "🌐 International Logistics Services (PVT)..." }
+n8n responds with { replyMessage: "🌐 ILS International Logistics Services..." }
         ↓
 whatsapp-bridge.js → sends ILS logo image with replyMessage as caption → Customer receives reply
 ```
@@ -134,7 +134,7 @@ Sheet tab: `Base Rate` — n8n reads from row 5 (skipping company header/notes r
 | `col_9` (col I) | Transshipment Ports |
 | `col_10` (col J) | Service Loops |
 
-**Note:** The sheet column header in col A is still `VAYANI SHIPPING LINE Karachi Locals` — this is the Google Sheets column key used for matching and must NOT be changed. The company name shown in bot replies is separately set to "International Logistics Services (PVT)" in the n8n code node. The sheet has ~94 destinations, all from Karachi.
+**Note:** The sheet column header in col A is still `VAYANI SHIPPING LINE Karachi Locals` — this is the Google Sheets column key used for matching and must NOT be changed. The company name shown in bot replies is separately set to "ILS International Logistics Services" in the n8n code node. The sheet has ~94 destinations, all from Karachi.
 
 ---
 
@@ -154,7 +154,7 @@ Sheet tab: `Base Rate` — n8n reads from row 5 (skipping company header/notes r
 11. Send Help Reply      → Respond to Webhook with { replyMessage }
 ```
 
-**Key node — Match and Format Reply1:** Contains all message formatting logic including company name, rate display, EBS surcharge note, and contact details. Edit this node in n8n to change reply content.
+**Key node — Match and Format Reply1:** Contains all message formatting logic including company name, rate display, EBS surcharge note, and contact details. Edit this node in n8n to change reply content. When no route matches, it builds a deduplicated, alphabetically sorted list of every destination city in the sheet (from `col_2`, taking the text before the first comma) and includes it in the reply along with contact details — both the matched and no-match branches now end with the same email/phone footer. The "hi"/help message (Format Help Message1) intentionally has no contact details.
 
 ---
 
@@ -188,7 +188,7 @@ Customer sends: `Karachi to Bangkok`
 
 Bot replies (ILS logo image + caption):
 ```
-🌐 *International Logistics Services (PVT)*
+🌐 *ILS International Logistics Services*
 🗺️ KARACHI → BANGKOK
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -211,11 +211,16 @@ Customer sends: `Karachi to Dubai` (not in sheet)
 
 Bot replies (ILS logo image + caption):
 ```
-❌ *No rates found*
+❌ *This route is not available*
 🗺️ KARACHI → DUBAI
+━━━━━━━━━━━━━━━━━━━━
 
-This route may not be available yet.
-📞 Please contact our team for this inquiry.
+Available destinations from Karachi:
+Bangkok, Belawan, Busan, Cebu City, ... (full alphabetical list of every destination in the sheet)
+
+━━━━━━━━━━━━━━━━━━━━
+📧 rizwan@ilsmtc.com
+📞 +92 300 1467979
 ```
 
 ---
@@ -259,6 +264,9 @@ Google Sheets matching uses **partial match** (case-insensitive):
 - ✅ Workflow published/activated on Railway n8n
 - ✅ whatsapp-bridge.js running and connected (WhatsApp session linked, no QR needed on restart)
 - ✅ End-to-end tested: "karachi to bangkok" → full rate reply; "karachi to dubai" → no rates found; "hello" → help message
+- ✅ Removed "(PVT)" from company name in all bot replies (2026-06-16)
+- ✅ No-match reply now lists all available Karachi destinations + contact details; contact details appear on every reply except the help/"hi" message (2026-06-16)
+- ✅ Company name in matched-route replies changed from "International Logistics Services" to "ILS International Logistics Services" (2026-06-16)
 - ❌ PC still required for whatsapp-bridge.js to stay running 24/7 (see Production Upgrade Plan below)
 
 ---
@@ -284,7 +292,47 @@ Self-hosted WhatsApp API requiring 3 extra Railway services (Evolution API + Pos
 **Option B — Twilio WhatsApp Business API (current plan):**
 Official WhatsApp Business API, no self-hosted server or PC dependency, pay-per-message (~$0.005/message). Decided as the preferred next step over Evolution API due to lower cost and no infra to maintain. Not yet implemented — would replace `whatsapp-bridge.js` with direct Twilio webhook integration into the existing n8n workflow.
 
+Migration steps when ready:
+1. Create Twilio account + apply for WhatsApp Business API sender (Meta approval, 1–3 days)
+2. Point Twilio WhatsApp webhook → existing Railway n8n webhook URL
+3. Update n8n: adjust webhook input parsing (Twilio sends `Body`, `From` fields vs current format) and replace "Send Rate Reply" node with a Twilio REST API call
+4. Decommission `whatsapp-bridge.js`
+
 **Decision:** Keep the current PC + whatsapp-bridge.js setup for now; revisit Twilio migration when PC-dependency becomes a real problem.
+
+---
+
+## Client Pricing Guide (Karachi Local Market)
+
+For selling this bot to a local Karachi freight/logistics business:
+
+**One-Time Setup Fee:** PKR 25,000 – 50,000 (~$90–$180)
+- Covers: building, deploying, testing, and handover
+
+**Monthly Maintenance Fee:** PKR 5,000 – 10,000/month (~$18–$36)
+- Covers: keeping everything running, rate sheet updates, fixing issues
+
+**Recommended pricing:** PKR 35,000 setup + PKR 7,000/month with a 3-month minimum contract
+
+**Monthly profit margin at PKR 7,000/month:**
+- You charge: PKR 7,000
+- Your actual cost: ~PKR 1,400–2,500 ($5–$9)
+- Your profit: ~PKR 4,500–5,600/month
+
+**Pitch to client:** "Instead of paying a staff member to answer the same rate questions all day, this bot handles it automatically 24/7 — for less than PKR 10,000/month."
+
+---
+
+## Maintenance Tasks (What You Actually Do)
+
+| Task | Effort | Frequency | Notes |
+|---|---|---|---|
+| Rate sheet updates | 5–10 min | Every 1–3 months | Client gets new freight rates — update Google Sheet |
+| WhatsApp bridge restart | 2–3 min | Every few weeks | Goes away after Twilio migration |
+| Railway/n8n health check | 2 min | Monthly | Just open Railway dashboard |
+| WhatsApp session expiry (QR re-scan) | 5 min | Rarely | Also goes away after Twilio migration |
+
+**Reality check:** Before Twilio — maybe 2–3 bridge restarts/month, 5 minutes each. After Twilio — maintenance drops to almost zero, just rate sheet updates. Total actual work is rarely more than 30 minutes/month.
 
 ---
 
@@ -300,6 +348,8 @@ Official WhatsApp Business API, no self-hosted server or PC dependency, pay-per-
 - Chrome DevTools MCP is used to update live n8n nodes — reconnect by restarting Claude Code
 - If Google Sheets ever returns a 403 "Forbidden" error again, check two things: (1) the sheet is still shared with `n8n-sheets-bot-823@first-scarab-499514-n9.iam.gserviceaccount.com`, and (2) the Sheets API is still enabled for project `first-scarab-499514-n9`
 - If "No rates found" appears for a route that's actually in the sheet, check that "Get All Rates1" Range Definition is set to "Detect Automatically" — a manually specified range breaks the column key matching
+- n8n's Code node editor (CodeMirror) search/replace box auto-converts `\n` typed into the Find/Replace fields into a real newline character, even outside regex mode. To search/replace a literal `\n` escape sequence as it appears in JS source (backslash + n), type a doubled backslash (`\\n`) in the box — otherwise "0 matches" is reported even though the text is visibly present.
+- The n8n Railway session expires fairly quickly while editing a workflow (autosave can fail with "Unauthorized" mid-edit). If that happens, do NOT reload the tab — the unsaved-changes dialog auto-accepts on reload and wipes the in-memory edit. Instead log in again in a separate browser tab (refreshes the shared session cookie) and return to the original tab; the in-progress edit and the editor's Publish button state survive.
 
 ---
 
